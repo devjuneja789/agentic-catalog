@@ -42,3 +42,15 @@ export interface CatalogListResponse {
   count: number
   products: ProductOffer[]
 }
+
+// Augments Express's Request with the raw body string, captured in index.ts
+// during JSON parsing — needed to validate Razorpay's webhook signature,
+// which must be computed over the untouched request body, not a re-stringified copy.
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      rawBody?: string
+    }
+  }
+}

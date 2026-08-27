@@ -1,7 +1,7 @@
 // Typed fetch wrappers to the backend API.
 // Checkout (Phase 2) and audit (Phase 3) wrappers get added here next.
 
-import type { CatalogListResponse, ProductOffer } from '../types'
+import type { CatalogListResponse, CheckoutRequest, CheckoutResponse, ProductOffer } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
@@ -38,4 +38,20 @@ export async function searchCatalog(params: CatalogSearchParams): Promise<Catalo
   const res = await fetch(`${API_BASE}/catalog/search?${query.toString()}`)
   if (!res.ok) throw new Error(`Catalog search failed: ${res.status}`)
   return res.json()
+}
+
+// checkout() deliberately doesn't throw on non-2xx — pending_approval (202),
+// out-of-stock (409), and guardrail rejections (422) are all expected
+// outcomes the caller needs to branch on, not exceptions.
+export async function checkout(
+  productId: string,
+  body: CheckoutRequest = {},
+): Promise<{ httpStatus: number; data: CheckoutResponse }> {
+  const res = await fetch(`${API_BASE}/checkout/${productId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = (await res.json()) as CheckoutResponse
+  return { httpStatus: res.status, data }
 }

@@ -6,8 +6,9 @@ of thing ChatGPT/Perplexity-style agentic checkout expects), with bounded and
 gated spending and a full audit log of every decision — payments run through
 Razorpay in test mode.
 
-> **Status: Phase 0 (scaffold) complete.** Catalog, checkout, guardrails, and
-> audit logic land in later phases — see the phase list below.
+> **Status: Phase 2 (checkout) complete.** Audit trail, graceful failure
+> handling, and the simulated AI buyer land in later phases — see the phase
+> list below.
 
 ## Stack
 
@@ -43,8 +44,8 @@ agentic-catalog/
 Built incrementally; each phase's code lands before the next starts.
 
 - [x] Phase 0 — Scaffold
-- [ ] Phase 1 — Catalog (agent-readable product API)
-- [ ] Phase 2 — Checkout (verify, bound, gate, Razorpay payment links)
+- [x] Phase 1 — Catalog (agent-readable product API)
+- [x] Phase 2 — Checkout (verify, bound, gate, Razorpay payment links)
 - [ ] Phase 3 — Audit trail
 - [ ] Phase 4 — Graceful failure handling
 - [ ] Phase 5 — Simulated AI buyer agent

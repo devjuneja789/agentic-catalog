@@ -38,3 +38,43 @@ export interface CatalogListResponse {
   count: number
   products: ProductOffer[]
 }
+
+// --- Checkout (Phase 2) ---
+
+export type OrderStatus = 'pending_approval' | 'awaiting_payment' | 'paid' | 'failed' | 'rejected' | 'cancelled'
+
+export interface CheckoutRequest {
+  quantity?: number
+  quotedPrice?: number
+  actor?: string
+  customerName?: string
+  customerEmail?: string
+  customerContact?: string
+}
+
+export interface CheckoutAwaitingPaymentResponse {
+  status: 'awaiting_payment'
+  orderId: string
+  amount: number
+  currency: string
+  paymentLink: string
+}
+
+export interface CheckoutPendingApprovalResponse {
+  status: 'pending_approval'
+  message: string
+  orderId: string
+  amount: number
+  approvalThreshold: number
+}
+
+// Covers every error shape the checkout/webhook endpoints can return
+// (INVALID_PRODUCT_ID, PRODUCT_NOT_FOUND, OUT_OF_STOCK, PRICE_MISMATCH,
+// ORDER_VALUE_EXCEEDS_MAX, PAYMENT_LINK_FAILED).
+export interface CheckoutErrorResponse {
+  error: string
+  message: string
+  [key: string]: unknown
+}
+
+export type CheckoutResponse = CheckoutAwaitingPaymentResponse | CheckoutPendingApprovalResponse | CheckoutErrorResponse
