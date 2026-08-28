@@ -78,3 +78,33 @@ export interface CheckoutErrorResponse {
 }
 
 export type CheckoutResponse = CheckoutAwaitingPaymentResponse | CheckoutPendingApprovalResponse | CheckoutErrorResponse
+
+// --- Audit trail (Phase 3) ---
+
+export type AuditAction =
+  | 'query'
+  | 'verify'
+  | 'gate'
+  | 'payment_created'
+  | 'payment_failed'
+  | 'payment_confirmed'
+  | 'payment_cancelled'
+
+export interface AuditLogEntry {
+  id: string
+  timestamp: string
+  actor: string
+  action: AuditAction
+  decision: string
+  reasoning: string
+  input?: Record<string, unknown>
+  result?: Record<string, unknown>
+  orderId?: string
+  productId?: string
+}
+
+export interface AuditTrailResponse {
+  orderId?: string
+  count: number
+  logs: AuditLogEntry[]
+}

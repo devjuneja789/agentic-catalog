@@ -1,7 +1,12 @@
 // Typed fetch wrappers to the backend API.
-// Checkout (Phase 2) and audit (Phase 3) wrappers get added here next.
 
-import type { CatalogListResponse, CheckoutRequest, CheckoutResponse, ProductOffer } from '../types'
+import type {
+  AuditTrailResponse,
+  CatalogListResponse,
+  CheckoutRequest,
+  CheckoutResponse,
+  ProductOffer,
+} from '../types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
@@ -54,4 +59,17 @@ export async function checkout(
   })
   const data = (await res.json()) as CheckoutResponse
   return { httpStatus: res.status, data }
+}
+
+// Pass orderId for a single order's full chronological trail (what
+// Dashboard's live audit view shows during a checkout), or omit it for a
+// recent-activity feed across all orders.
+export async function getAuditTrail(options: { orderId?: string; limit?: number } = {}): Promise<AuditTrailResponse> {
+  const query = new URLSearchParams()
+  if (options.orderId) query.set('orderId', options.orderId)
+  if (options.limit !== undefined) query.set('limit', String(options.limit))
+
+  const res = await fetch(`${API_BASE}/audit?${query.toString()}`)
+  if (!res.ok) throw new Error(`Failed to load audit trail: ${res.status}`)
+  return res.json()
 }
