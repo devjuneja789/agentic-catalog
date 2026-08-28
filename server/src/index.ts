@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler'
 import catalogRoutes from './routes/catalog.routes'
 import checkoutRoutes from './routes/checkout.routes'
 import webhookRoutes from './routes/webhook.routes'
+import auditRoutes from './routes/audit.routes'
 import './types' // pulls in the Express.Request.rawBody augmentation
 
 const app = express()
@@ -34,15 +35,13 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/catalog', catalogRoutes)
 app.use('/api/checkout', checkoutRoutes)
 app.use('/api/webhooks/razorpay', webhookRoutes)
-
-// Mounted here starting Phase 3:
-// app.use('/api/audit', auditRoutes)
+app.use('/api/audit', auditRoutes)
 
 app.use(errorHandler)
 
 async function start(): Promise<void> {
   await connectDB()
-  app.listen(config.port, '0.0.0.0', () => {
+  app.listen(config.port, () => {
     console.log(`[server] Listening on http://localhost:${config.port}`)
   })
 }

@@ -28,27 +28,84 @@ export interface PaymentLinkResult {
   status: string
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
+}
+
+// A single attempt at creating a payment link, bounded by a hard timeout so
+// a slow or hanging network call can't stall a checkout indefinitely.
 export async function createPaymentLink(params: CreatePaymentLinkParams): Promise<PaymentLinkResult> {
+  if (config.razorpay.simulateFailure) {
+    throw new Error('Simulated Razorpay failure (RAZORPAY_SIMULATE_FAILURE=true in server/.env)')
+  }
+
   const razorpay = getClient()
 
-  const link = await razorpay.paymentLink.create({
-    amount: Math.round(params.amount * 100), // Razorpay wants the smallest currency unit (paise for INR)
-    currency: params.currency,
-    description: params.description,
-    reference_id: params.referenceId,
-    notes: params.notes,
-    // No real customer contact exists yet in an agent-driven flow — Razorpay's
-    // `customer` object is required, but every field inside it is optional.
-    customer: params.customer ?? {},
-    notify: { sms: false, email: false },
-    reminder_enable: false,
-  })
+  const link = await withTimeout(
+    razorpay.paymentLink.create({
+      amount: Math.round(params.amount * 100), // Razorpay wants the smallest currency unit (paise for INR)
+      currency: params.currency,
+      description: params.description,
+      reference_id: params.referenceId,
+      notes: params.notes,
+      // No real customer contact exists yet in an agent-driven flow —
+      // Razorpay's `customer` object is required, but every field inside it is optional.
+      customer: params.customer ?? {},
+      notify: { sms: false, email: false },
+      reminder_enable: false,
+    }),
+    config.razorpay.requestTimeoutMs,
+    'Razorpay payment link creation',
+  )
 
   return {
     id: link.id,
     shortUrl: link.short_url,
     status: link.status,
   }
+}
+
+export class PaymentLinkCreationError extends Error {
+  attempts: string[]
+
+  constructor(message: string, attempts: string[]) {
+    super(message)
+    this.name = 'PaymentLinkCreationError'
+    this.attempts = attempts
+  }
+}
+
+// What the checkout controller actually calls: retries exactly once on any
+// failure (network error, timeout, Razorpay error response) before giving up
+// with a structured error carrying both attempts' messages, for the audit trail.
+export async function createPaymentLinkWithRetry(params: CreatePaymentLinkParams): Promise<PaymentLinkResult> {
+  const attempts: string[] = []
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await createPaymentLink(params)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      attempts.push(`attempt ${attempt}: ${message}`)
+      if (attempt === 1) {
+        console.warn(`[razorpay] Payment link creation failed (attempt 1) — retrying once. ${message}`)
+      }
+    }
+  }
+
+  throw new PaymentLinkCreationError('Payment link creation failed after 1 retry.', attempts)
 }
 
 // Per Razorpay's docs: signature must be validated against the *raw* request

@@ -31,28 +31,51 @@ export async function verifyProduct(
     return { ok: false, code: 'INVALID_PRODUCT_ID', message: 'Invalid product id.' }
   }
 
-  const product = await Product.findById(productId)
-  if (!product) {
+  const existing = await Product.findById(productId)
+  if (!existing) {
     return { ok: false, code: 'PRODUCT_NOT_FOUND', message: 'Product not found.', details: { productId } }
   }
 
-  if (product.stock < quantity) {
-    return {
-      ok: false,
-      code: 'OUT_OF_STOCK',
-      message: `Only ${product.stock} left in stock, ${quantity} requested.`,
-      details: { productId, stock: product.stock, requested: quantity },
-    }
-  }
-
-  if (quotedPrice !== undefined && quotedPrice !== product.price.amount) {
+  if (quotedPrice !== undefined && quotedPrice !== existing.price.amount) {
     return {
       ok: false,
       code: 'PRICE_MISMATCH',
-      message: `Quoted price ₹${quotedPrice} no longer matches the current price ₹${product.price.amount}.`,
-      details: { productId, quotedPrice, currentPrice: product.price.amount },
+      message: `Quoted price ₹${quotedPrice} no longer matches the current price ₹${existing.price.amount}.`,
+      details: { productId, quotedPrice, currentPrice: existing.price.amount },
     }
   }
 
-  return { ok: true, product }
+  // Atomic reserve: the $gte guard and the $inc decrement happen as one
+  // MongoDB operation on one document, not a separate read followed by a
+  // separate write. Of two requests racing for the last unit, only one can
+  // ever have this succeed — the other gets null back, not a stale read of
+  // stock that's already gone. This is what actually prevents overselling
+  // under a duplicate/simultaneous request, not just the earlier read-check.
+  const reserved = await Product.findOneAndUpdate(
+    { _id: productId, stock: { $gte: quantity } },
+    { $inc: { stock: -quantity } },
+    { new: true },
+  )
+
+  if (!reserved) {
+    // Lost the race (or an admin zeroed stock out) — re-read for an
+    // accurate count to put in the error.
+    const current = await Product.findById(productId)
+    const currentStock = current?.stock ?? 0
+    return {
+      ok: false,
+      code: 'OUT_OF_STOCK',
+      message: `Only ${currentStock} left in stock, ${quantity} requested.`,
+      details: { productId, stock: currentStock, requested: quantity },
+    }
+  }
+
+  return { ok: true, product: reserved }
+}
+
+// Pairs with the reservation above. Called whenever a reserved order doesn't
+// end up completing — guardrail rejection, payment-link creation failure, or
+// the link later expiring/being cancelled — so stock isn't lost forever.
+export async function releaseStock(productId: string | Types.ObjectId, quantity: number): Promise<void> {
+  await Product.updateOne({ _id: productId }, { $inc: { stock: quantity } })
 }

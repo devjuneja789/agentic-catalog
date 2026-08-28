@@ -43,6 +43,36 @@ export interface CatalogListResponse {
   products: ProductOffer[]
 }
 
+// --- Audit trail (Phase 3) ---
+
+export type AuditAction =
+  | 'query'
+  | 'verify'
+  | 'gate'
+  | 'payment_created'
+  | 'payment_failed'
+  | 'payment_confirmed'
+  | 'payment_cancelled'
+
+export interface AuditLogEntry {
+  id: string
+  timestamp: string
+  actor: string
+  action: AuditAction
+  decision: string
+  reasoning: string
+  input?: Record<string, unknown>
+  result?: Record<string, unknown>
+  orderId?: string
+  productId?: string
+}
+
+export interface AuditTrailResponse {
+  orderId?: string
+  count: number
+  logs: AuditLogEntry[]
+}
+
 // Augments Express's Request with the raw body string, captured in index.ts
 // during JSON parsing — needed to validate Razorpay's webhook signature,
 // which must be computed over the untouched request body, not a re-stringified copy.

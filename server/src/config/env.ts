@@ -22,6 +22,12 @@ export const config = {
     keyId: process.env.RAZORPAY_KEY_ID ?? '',
     keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
     webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? '',
+    // Phase 4: retry-once + structured fallback on timeout
+    requestTimeoutMs: Number(process.env.RAZORPAY_TIMEOUT_MS ?? 8000),
+    // Deliberate escape hatch for demos — set to "true" to force every
+    // payment-link creation to fail, so the retry + fallback path can be
+    // shown reliably without depending on real network flakiness.
+    simulateFailure: process.env.RAZORPAY_SIMULATE_FAILURE === 'true',
   },
 
   // Phase 2: bounded + gated checkout thresholds
