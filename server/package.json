@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "tsx scripts/seedCatalog.ts",
-    "test:race": "tsx scripts/testConcurrentCheckout.ts"
+    "test:race": "tsx scripts/testConcurrentCheckout.ts",
+    "agent": "tsx src/agent/buyerAgent.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

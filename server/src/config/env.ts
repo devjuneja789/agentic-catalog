@@ -40,6 +40,8 @@ export const config = {
   llm: {
     apiKey: process.env.LLM_API_KEY ?? '',
     provider: process.env.LLM_PROVIDER ?? 'gemini',
+    model: process.env.LLM_MODEL ?? 'gemini-3.5-flash',
+    requestTimeoutMs: Number(process.env.LLM_TIMEOUT_MS ?? 15000),
   },
 
   // Static merchant identity, embedded in every catalog offer's `seller` field

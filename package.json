@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "concurrently -n CLIENT,SERVER -c blue,green \"npm run dev -w client\" \"npm run dev -w server\"",
     "build": "npm run build -w client && npm run build -w server",
-    "seed": "npm run seed -w server"
+    "seed": "npm run seed -w server",
+    "agent": "npm run agent -w server --"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
