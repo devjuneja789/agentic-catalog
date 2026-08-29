@@ -1,9 +1,12 @@
 import { NextFunction, Request, Response } from 'express'
-import { runBuyerAgentFlow } from '../agent/buyerAgentFlow'
+import { BuyerCustomer, runBuyerAgentFlow } from '../agent/buyerAgentFlow'
 import { config } from '../config/env'
 
 interface RunAgentRequestBody {
   want?: string
+  customerName?: string
+  customerEmail?: string
+  customerContact?: string
 }
 
 // POST /api/agent/buy
@@ -24,8 +27,20 @@ export async function runBuyerAgent(
       return
     }
 
+    const customerName = req.body.customerName?.trim()
+    if (!customerName) {
+      res.status(400).json({ error: { message: '"customerName" is required to create a payment link', code: 'MISSING_CUSTOMER_NAME' } })
+      return
+    }
+
+    const customer: BuyerCustomer = {
+      name: customerName,
+      email: req.body.customerEmail?.trim() || undefined,
+      contact: req.body.customerContact?.trim() || undefined,
+    }
+
     const apiBase = `http://localhost:${config.port}/api`
-    const result = await runBuyerAgentFlow(want, apiBase)
+    const result = await runBuyerAgentFlow(want, apiBase, undefined, customer)
 
     res.json(result)
   } catch (err) {

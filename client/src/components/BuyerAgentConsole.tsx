@@ -62,17 +62,18 @@ const stepClass: Record<StepStatus, string> = {
 
 export function BuyerAgentConsole({ onOrderCreated }: { onOrderCreated?: (orderId: string) => void }) {
   const [want, setWant] = useState('')
+  const [customerName, setCustomerName] = useState('')
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<BuyerAgentResult | null>(null)
   const [fatalError, setFatalError] = useState<string | null>(null)
 
   async function run() {
-    if (!want.trim() || running) return
+    if (!want.trim() || !customerName.trim() || running) return
     setRunning(true)
     setFatalError(null)
     setResult(null)
     try {
-      const data = await runBuyerAgent(want.trim())
+      const data = await runBuyerAgent(want.trim(), customerName.trim())
       setResult(data)
       const orderId = data.checkout?.body.orderId
       if (typeof orderId === 'string' && onOrderCreated) onOrderCreated(orderId)
@@ -88,7 +89,7 @@ export function BuyerAgentConsole({ onOrderCreated }: { onOrderCreated?: (orderI
 
   return (
     <div className="space-y-5">
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           placeholder='e.g. "black hoodie under ₹1500"'
           value={want}
@@ -96,7 +97,14 @@ export function BuyerAgentConsole({ onOrderCreated }: { onOrderCreated?: (orderI
           onKeyDown={(e) => e.key === 'Enter' && run()}
           disabled={running}
         />
-        <Button onClick={run} loading={running} disabled={!want.trim()}>
+        <Input
+          placeholder="Customer name"
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && run()}
+          disabled={running}
+        />
+        <Button onClick={run} loading={running} disabled={!want.trim() || !customerName.trim()}>
           Run
         </Button>
       </div>

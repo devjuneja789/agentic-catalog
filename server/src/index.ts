@@ -8,6 +8,7 @@ import catalogRoutes from './routes/catalog.routes'
 import checkoutRoutes from './routes/checkout.routes'
 import webhookRoutes from './routes/webhook.routes'
 import auditRoutes from './routes/audit.routes'
+import agentRoutes from './routes/agent.routes'
 import './types' // pulls in the Express.Request.rawBody augmentation
 
 const app = express()
@@ -36,6 +37,7 @@ app.use('/api/catalog', catalogRoutes)
 app.use('/api/checkout', checkoutRoutes)
 app.use('/api/webhooks/razorpay', webhookRoutes)
 app.use('/api/audit', auditRoutes)
+app.use('/api/agent', agentRoutes)
 
 app.use(errorHandler)
 

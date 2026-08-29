@@ -2,10 +2,12 @@
 
 import type {
   AuditTrailResponse,
+  BuyerAgentResult,
   CatalogListResponse,
   CheckoutRequest,
   CheckoutResponse,
   ProductOffer,
+  UpdateProductRequest,
 } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
@@ -71,5 +73,35 @@ export async function getAuditTrail(options: { orderId?: string; limit?: number 
 
   const res = await fetch(`${API_BASE}/audit?${query.toString()}`)
   if (!res.ok) throw new Error(`Failed to load audit trail: ${res.status}`)
+  return res.json()
+}
+
+// --- Catalog admin (Phase 6) ---
+
+export async function updateProduct(id: string, fields: UpdateProductRequest): Promise<ProductOffer> {
+  const res = await fetch(`${API_BASE}/catalog/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-Actor': 'catalog-admin' },
+    body: JSON.stringify(fields),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.error?.message ?? `Failed to update product: ${res.status}`)
+  }
+  return res.json()
+}
+
+// --- Buyer agent (Phase 5, HTTP-triggerable in Phase 6) ---
+
+export async function runBuyerAgent(want: string, customerName: string): Promise<BuyerAgentResult> {
+  const res = await fetch(`${API_BASE}/agent/buy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ want, customerName }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.error?.message ?? `Buyer agent request failed: ${res.status}`)
+  }
   return res.json()
 }

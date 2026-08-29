@@ -89,6 +89,7 @@ export type AuditAction =
   | 'payment_failed'
   | 'payment_confirmed'
   | 'payment_cancelled'
+  | 'catalog_update'
 
 export interface AuditLogEntry {
   id: string
@@ -107,4 +108,39 @@ export interface AuditTrailResponse {
   orderId?: string
   count: number
   logs: AuditLogEntry[]
+}
+
+// --- Catalog admin (Phase 6) ---
+
+export interface UpdateProductRequest {
+  name?: string
+  description?: string
+  category?: string
+  price?: number
+  stock?: number
+}
+
+// --- Buyer agent (Phase 5, HTTP-triggerable in Phase 6) ---
+
+export interface BuyerAgentIntent {
+  query: string
+  maxPrice?: number
+}
+
+export interface BuyerAgentPick {
+  productId: string
+  reasoning: string
+  fellBack: boolean
+}
+
+export type BuyerAgentStoppedAt = 'parse_intent' | 'search' | 'no_matches' | 'pick_match'
+
+export interface BuyerAgentResult {
+  want: string
+  intent?: BuyerAgentIntent
+  offers?: ProductOffer[]
+  picked?: BuyerAgentPick
+  checkout?: { status: number; body: Record<string, unknown> }
+  error?: string
+  stoppedAt?: BuyerAgentStoppedAt
 }

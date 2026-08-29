@@ -19,6 +19,12 @@ interface PickedMatch {
   reasoning: string
 }
 
+export interface BuyerCustomer {
+  name: string
+  email?: string
+  contact?: string
+}
+
 export type BuyerAgentProgressEvent =
   | { step: 'parsing' }
   | { step: 'searching'; intent: ParsedIntent }
@@ -93,11 +99,19 @@ async function checkout(
   apiBase: string,
   productId: string,
   quotedPrice: number,
+  customer?: BuyerCustomer,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await fetch(`${apiBase}/checkout/${productId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Actor': ACTOR },
-    body: JSON.stringify({ quantity: 1, quotedPrice, actor: ACTOR }),
+    body: JSON.stringify({
+      quantity: 1,
+      quotedPrice,
+      actor: ACTOR,
+      customerName: customer?.name,
+      customerEmail: customer?.email,
+      customerContact: customer?.contact,
+    }),
   })
   const body = (await res.json()) as Record<string, unknown>
   return { status: res.status, body }
@@ -108,6 +122,7 @@ export async function runBuyerAgentFlow(
   want: string,
   apiBase: string,
   onProgress?: (event: BuyerAgentProgressEvent) => void,
+  customer?: BuyerCustomer,
 ): Promise<BuyerAgentResult> {
   onProgress?.({ step: 'parsing' })
   let intent: ParsedIntent
@@ -141,7 +156,7 @@ export async function runBuyerAgentFlow(
   const chosen = offers.find((o) => o.id === picked.productId) ?? offers[0]
 
   onProgress?.({ step: 'checking_out', chosen })
-  const { status, body } = await checkout(apiBase, chosen.id, chosen.price.amount)
+  const { status, body } = await checkout(apiBase, chosen.id, chosen.price.amount, customer)
 
   return {
     want,

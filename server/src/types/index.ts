@@ -53,6 +53,7 @@ export type AuditAction =
   | 'payment_failed'
   | 'payment_confirmed'
   | 'payment_cancelled'
+  | 'catalog_update'
 
 export interface AuditLogEntry {
   id: string
@@ -71,6 +72,42 @@ export interface AuditTrailResponse {
   orderId?: string
   count: number
   logs: AuditLogEntry[]
+}
+
+// --- Catalog admin (Phase 6) ---
+
+export interface UpdateProductRequest {
+  name?: string
+  description?: string
+  category?: string
+  price?: number // amount in INR — currency stays fixed
+  stock?: number
+}
+
+// --- Buyer agent (Phase 5, made HTTP-triggerable in Phase 6) ---
+
+export interface BuyerAgentIntent {
+  query: string
+  maxPrice?: number
+}
+
+export interface BuyerAgentPick {
+  productId: string
+  reasoning: string
+  fellBack: boolean // true if Gemini's pick wasn't in the results and we fell back to the top match
+}
+
+export type BuyerAgentStoppedAt = 'parse_intent' | 'search' | 'no_matches' | 'pick_match'
+
+export interface BuyerAgentResult {
+  want: string
+  intent?: BuyerAgentIntent
+  offers?: ProductOffer[]
+  picked?: BuyerAgentPick
+  checkout?: { status: number; body: Record<string, unknown> }
+  // Set only if the flow stopped before reaching checkout.
+  error?: string
+  stoppedAt?: BuyerAgentStoppedAt
 }
 
 // Augments Express's Request with the raw body string, captured in index.ts

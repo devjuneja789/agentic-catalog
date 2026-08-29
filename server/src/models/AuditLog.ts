@@ -11,6 +11,7 @@ export type AuditAction =
   | 'payment_failed' // Phase 2: Razorpay call itself failed
   | 'payment_confirmed' // Phase 2 webhook: payment_link.paid
   | 'payment_cancelled' // Phase 2 webhook: payment_link.cancelled / expired
+  | 'catalog_update' // Phase 6: admin edited a product (e.g. stock) from the dashboard
 
 export interface IAuditLog {
   timestamp: Date
@@ -30,7 +31,16 @@ const auditLogSchema = new Schema<IAuditLog>({
   action: {
     type: String,
     required: true,
-    enum: ['query', 'verify', 'gate', 'payment_created', 'payment_failed', 'payment_confirmed', 'payment_cancelled'],
+    enum: [
+      'query',
+      'verify',
+      'gate',
+      'payment_created',
+      'payment_failed',
+      'payment_confirmed',
+      'payment_cancelled',
+      'catalog_update',
+    ],
   },
   input: { type: Schema.Types.Mixed },
   decision: { type: String, required: true },

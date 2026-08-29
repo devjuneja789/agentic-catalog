@@ -30,17 +30,11 @@ export interface PaymentLinkResult {
 
 interface RazorpayApiError {
   statusCode?: number
-  error?: {
-    code?: string
-    description?: string
-    field?: string
-    reason?: string
-  }
+  error?: { code?: string; description?: string; field?: string; reason?: string }
 }
 
-// The Razorpay SDK rejects with a plain object ({ statusCode, error }) rather
-// than an Error instance. Convert it once here so retry logs and audit entries
-// retain the useful API response instead of becoming "[object Object]".
+// Razorpay's SDK rejects with a plain object, not an Error. Keep its useful
+// details in retry logs and the audit trail instead of recording [object Object].
 function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message
 
@@ -53,11 +47,10 @@ function errorMessage(err: unknown): string {
       const reason = details.reason ? ` (${details.reason})` : ''
       return `${status}: ${details.code ?? 'UNKNOWN'} — ${details.description ?? 'No description'}${field}${reason}`
     }
-
     try {
       return JSON.stringify(err)
     } catch {
-      // Fall through to the stable generic message below.
+      // Use the generic fallback below when this is not serializable.
     }
   }
 
@@ -92,24 +85,19 @@ export async function createPaymentLink(params: CreatePaymentLinkParams): Promis
     ? Object.fromEntries(Object.entries(params.customer).filter(([, value]) => value !== undefined && value !== ''))
     : undefined
 
-  // Customer details are optional for a standard Payment Link. In particular,
-  // the CLI buyer does not know a real customer's contact information, so do
-  // not turn that absence into an empty `customer: {}` object in the API call.
-  // Razorpay's published TypeScript definitions mark `customer` as required,
-  // although the HTTP API accepts it as optional.
-  const payload = {
-    amount: Math.round(params.amount * 100), // Razorpay wants the smallest currency unit (paise for INR)
-    currency: params.currency,
-    description: params.description,
-    reference_id: params.referenceId,
-    notes: params.notes,
-    ...(customer && Object.keys(customer).length > 0 ? { customer } : {}),
-    notify: { sms: false, email: false },
-    reminder_enable: false,
-  }
-
   const link = await withTimeout(
-    razorpay.paymentLink.create(payload as Parameters<typeof razorpay.paymentLink.create>[0]),
+    razorpay.paymentLink.create({
+      amount: Math.round(params.amount * 100), // Razorpay wants the smallest currency unit (paise for INR)
+      currency: params.currency,
+      description: params.description,
+      reference_id: params.referenceId,
+      notes: params.notes,
+      // The agent must send a non-empty name. Avoid emitting customer: {} when
+      // a direct API consumer does not provide any details.
+      customer: customer ?? {},
+      notify: { sms: false, email: false },
+      reminder_enable: false,
+    }),
     config.razorpay.requestTimeoutMs,
     'Razorpay payment link creation',
   )

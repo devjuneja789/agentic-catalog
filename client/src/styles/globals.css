@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  background-color: #14141f;
+  color: #edeae3;
+}
+
+/* Subtle focus ring shared by interactive elements — visible, not garish */
+.focus-thread:focus-visible {
+  outline: 2px solid #d4a24e;
+  outline-offset: 2px;
+}
