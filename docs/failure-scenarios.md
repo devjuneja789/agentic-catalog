@@ -46,7 +46,7 @@ approve them.
 
 **How to trigger it for a demo, two ways:**
 
-- *Manual, via the admin panel (Phase 6):* set a product's stock to 0 while
+- *Manual, via the admin panel:* set a product's stock to 0 while
   a checkout is about to run against it. The next checkout attempt gets
   `409 OUT_OF_STOCK` immediately.
 - *Automated, proving the race is actually handled:* set a product's stock
