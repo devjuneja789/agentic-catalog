@@ -89,3 +89,6 @@ For payment-status updates, expose the server with `ngrok http 5000`, register `
 - Catalog administration has no authentication and is intended for local demos.
 - Orders awaiting approval do not yet have an approve/deny endpoint.
 - The dashboard displays the completed agent run rather than streaming each intermediate step.
+
+## Example
+<img width="1917" height="1026" alt="Screenshot 2026-08-31 111532" src="https://github.com/user-attachments/assets/10076646-0992-4057-888f-e158f65fd402" />
