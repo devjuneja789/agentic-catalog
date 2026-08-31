@@ -80,7 +80,6 @@ For payment-status updates, expose the server with `ngrok http 5000`, register `
 
 ## Demo and technical notes
 
-- [Demo script](docs/demo-script.md) — concise presentation walkthrough.
 - [Architecture](docs/architecture.md) — request flow and design decisions.
 - [Failure handling](docs/failure-scenarios.md) — stock and payment failure behaviour.
 - [Audit schema](docs/audit-schema.md) — audit events and fields.
