@@ -85,12 +85,16 @@ export async function createPaymentLink(params: CreatePaymentLinkParams): Promis
     ? Object.fromEntries(Object.entries(params.customer).filter(([, value]) => value !== undefined && value !== ''))
     : undefined
 
+  const callbackUrl = `${config.clientUrl.replace(/\/$/, '')}/checkout/success?referenceId=${encodeURIComponent(params.referenceId)}`
+
   const link = await withTimeout(
     razorpay.paymentLink.create({
       amount: Math.round(params.amount * 100), // Razorpay wants the smallest currency unit (paise for INR)
       currency: params.currency,
       description: params.description,
       reference_id: params.referenceId,
+      callback_url: callbackUrl,
+      callback_method: 'get',
       notes: params.notes,
       // The agent must send a non-empty name. Avoid emitting customer: {} when
       // a direct API consumer does not provide any details.
@@ -107,6 +111,15 @@ export async function createPaymentLink(params: CreatePaymentLinkParams): Promis
     shortUrl: link.short_url,
     status: link.status,
   }
+}
+
+export async function fetchPaymentLink(paymentLinkId: string): Promise<any> {
+  const razorpay = getClient()
+  return withTimeout(
+    razorpay.paymentLink.fetch(paymentLinkId),
+    config.razorpay.requestTimeoutMs,
+    'Razorpay payment link fetch',
+  )
 }
 
 export class PaymentLinkCreationError extends Error {

@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express'
 import { IOrder, Order } from '../models/Order'
 import { releaseStock, verifyProduct } from '../services/verification.service'
 import { evaluateGuardrails } from '../services/guardrails.service'
-import { PaymentLinkCreationError, createPaymentLinkWithRetry, verifyWebhookSignature } from '../services/razorpay.service'
+import { PaymentLinkCreationError, createPaymentLinkWithRetry, fetchPaymentLink, verifyWebhookSignature } from '../services/razorpay.service'
 import { logAudit, resolveActor } from '../services/audit.service'
 import { config } from '../config/env'
 
@@ -310,6 +310,290 @@ export async function handleRazorpayWebhook(req: Request, res: Response, next: N
     }
 
     res.status(200).json({ received: true })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// POST /api/checkout/:orderId/verify
+// POST /api/checkout/:orderId/capture
+// Invoked when user is redirected back to /checkout/success after paying via Razorpay Payment Link
+export async function verifyOrderPaymentEndpoint(
+  req: Request<{ orderId: string }, unknown, { razorpayPaymentId?: string; razorpayPaymentLinkId?: string; razorpaySignature?: string }>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { orderId } = req.params
+    const order = await Order.findById(orderId)
+    if (!order) {
+      res.status(404).json({ error: 'ORDER_NOT_FOUND', message: `Order ${orderId} not found` })
+      return
+    }
+
+    if (order.status === 'paid') {
+      res.status(200).json({ status: 'paid', message: 'Order is already paid', orderId, order })
+      return
+    }
+
+    const razorpayPaymentId =
+      req.body.razorpayPaymentId || (req.query.razorpay_payment_id as string | undefined)
+    const paymentLinkId =
+      order.razorpay?.paymentLinkId ||
+      req.body.razorpayPaymentLinkId ||
+      (req.query.razorpay_payment_link_id as string | undefined)
+
+    // Check payment status from Razorpay API if paymentLinkId exists
+    let verifiedPaymentId = razorpayPaymentId
+    if (paymentLinkId) {
+      try {
+        const fetchedLink = await fetchPaymentLink(paymentLinkId)
+        if (fetchedLink && (fetchedLink.status === 'paid' || fetchedLink.amount_paid > 0)) {
+          verifiedPaymentId = verifiedPaymentId || fetchedLink.payments?.[0]?.payment_id
+        }
+      } catch (fetchErr) {
+        console.warn(`[checkout] Could not fetch Razorpay link ${paymentLinkId}:`, fetchErr)
+      }
+    }
+
+    // Mark as paid
+    order.status = 'paid'
+    if (!order.razorpay) order.razorpay = {}
+    if (verifiedPaymentId) order.razorpay.paymentId = verifiedPaymentId
+    order.razorpay.status = 'paid'
+    await order.save()
+
+    await logAudit({
+      actor: 'client-redirect-verify',
+      action: 'payment_confirmed',
+      decision: 'paid',
+      reasoning: `Razorpay payment verified upon return redirect (Payment ID: ${order.razorpay.paymentId || 'N/A'}).`,
+      input: { orderId, razorpayPaymentId: order.razorpay.paymentId, paymentLinkId },
+      result: { status: 'paid', paymentId: order.razorpay.paymentId },
+      orderId: order._id,
+      productId: order.product.productId,
+    })
+
+    res.status(200).json({
+      status: 'paid',
+      orderId: order._id.toString(),
+      paymentId: order.razorpay.paymentId,
+      order,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// POST /api/checkout/:orderId/cancel
+// Invoked when user navigates to /checkout/cancel or cancels payment
+export async function cancelOrderEndpoint(
+  req: Request<{ orderId: string }, unknown, { reason?: string }>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { orderId } = req.params
+    const order = await Order.findById(orderId)
+    if (!order) {
+      res.status(404).json({ error: 'ORDER_NOT_FOUND', message: `Order ${orderId} not found` })
+      return
+    }
+
+    if (order.status === 'cancelled') {
+      res.status(200).json({ status: 'cancelled', message: 'Order is already cancelled', orderId, order })
+      return
+    }
+
+    if (order.status === 'paid') {
+      res.status(400).json({ error: 'ALREADY_PAID', message: 'Cannot cancel an order that has already been paid' })
+      return
+    }
+
+    const reason = req.body.reason || 'Checkout session cancelled by shopper.'
+
+    // Atomically release stock if it was held
+    if (order.status === 'awaiting_payment' || order.status === 'pending_approval') {
+      await releaseStock(order.product.productId, order.quantity)
+    }
+
+    order.status = 'cancelled'
+    order.rejectionReason = reason
+    if (order.razorpay) order.razorpay.status = 'cancelled'
+    await order.save()
+
+    await logAudit({
+      actor: 'client-redirect-cancel',
+      action: 'payment_cancelled',
+      decision: 'cancelled',
+      reasoning: `${reason} Released ${order.quantity} reserved unit(s) back to stock.`,
+      input: { orderId, reason },
+      result: { stockReleased: order.quantity },
+      orderId: order._id,
+      productId: order.product.productId,
+    })
+
+    res.status(200).json({
+      status: 'cancelled',
+      orderId: order._id.toString(),
+      message: reason,
+      stockReleased: order.quantity,
+      order,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// GET /api/checkout/:orderId
+export async function getOrderEndpoint(
+  req: Request<{ orderId: string }>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { orderId } = req.params
+    const order = await Order.findById(orderId)
+    if (!order) {
+      res.status(404).json({ error: 'ORDER_NOT_FOUND', message: `Order ${orderId} not found` })
+      return
+    }
+    res.status(200).json({ order })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// GET /api/checkout/pending
+export async function getPendingOrdersEndpoint(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const orders = await Order.find({ status: 'pending_approval' }).sort({ createdAt: -1 })
+    res.status(200).json({ count: orders.length, orders })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// POST /api/checkout/:orderId/approve
+export async function approveOrderEndpoint(
+  req: Request<{ orderId: string }>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { orderId } = req.params
+    const order = await Order.findById(orderId)
+    if (!order) {
+      res.status(404).json({ error: 'ORDER_NOT_FOUND', message: `Order ${orderId} not found` })
+      return
+    }
+
+    if (order.status !== 'pending_approval') {
+      res.status(400).json({
+        error: 'INVALID_STATUS',
+        message: `Order status is "${order.status}", only "pending_approval" can be approved.`,
+      })
+      return
+    }
+
+    // Generate Razorpay Payment Link
+    const paymentLink = await createPaymentLinkWithRetry({
+      amount: order.amount,
+      currency: order.currency || 'INR',
+      description: `${order.product.name} x${order.quantity}`,
+      referenceId: order._id.toString(),
+      notes: {
+        productId: order.product.productId.toString(),
+        sku: order.product.sku,
+        orderId: order._id.toString(),
+      },
+    })
+
+    order.razorpay = {
+      paymentLinkId: paymentLink.id,
+      paymentLinkUrl: paymentLink.shortUrl,
+      status: paymentLink.status,
+    }
+    order.status = 'awaiting_payment'
+    await order.save()
+
+    await logAudit({
+      actor: 'admin-approval',
+      action: 'gate',
+      decision: 'approved_by_admin',
+      reasoning: `Human manager approved order of ₹${order.amount}. Issued Razorpay payment link (${paymentLink.id}).`,
+      input: { orderId: order._id.toString(), amount: order.amount },
+      result: { paymentLinkId: paymentLink.id, paymentLinkUrl: paymentLink.shortUrl },
+      orderId: order._id,
+      productId: order.product.productId,
+    })
+
+    res.status(200).json({
+      status: 'awaiting_payment',
+      orderId: order._id.toString(),
+      paymentLinkId: paymentLink.id,
+      paymentLink: paymentLink.shortUrl,
+      paymentLinkUrl: paymentLink.shortUrl,
+      order,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// POST /api/checkout/:orderId/deny
+export async function denyOrderEndpoint(
+  req: Request<{ orderId: string }, unknown, { reason?: string }>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { orderId } = req.params
+    const order = await Order.findById(orderId)
+    if (!order) {
+      res.status(404).json({ error: 'ORDER_NOT_FOUND', message: `Order ${orderId} not found` })
+      return
+    }
+
+    if (order.status !== 'pending_approval') {
+      res.status(400).json({
+        error: 'INVALID_STATUS',
+        message: `Order status is "${order.status}", only "pending_approval" can be denied.`,
+      })
+      return
+    }
+
+    const reason = req.body.reason || 'Order denied by store administrator.'
+
+    // Atomically release the held stock
+    await releaseStock(order.product.productId, order.quantity)
+
+    order.status = 'rejected'
+    order.rejectionReason = reason
+    await order.save()
+
+    await logAudit({
+      actor: 'admin-approval',
+      action: 'gate',
+      decision: 'denied_by_admin',
+      reasoning: `${reason} Released ${order.quantity} reserved unit(s) back to inventory.`,
+      input: { orderId: order._id.toString(), reason },
+      result: { stockReleased: order.quantity },
+      orderId: order._id,
+      productId: order.product.productId,
+    })
+
+    res.status(200).json({
+      status: 'rejected',
+      orderId: order._id.toString(),
+      message: reason,
+      stockReleased: order.quantity,
+      order,
+    })
   } catch (err) {
     next(err)
   }

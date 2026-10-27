@@ -2,13 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #14141f;
-  color: #edeae3;
+@layer base {
+  body {
+    background-color: #08090C;
+    color: #F8FAFC;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
 }
 
-/* Subtle focus ring shared by interactive elements — visible, not garish */
+/* Developer-first fine grid background texture */
+.bg-tech-grid {
+  background-image: 
+    radial-gradient(ellipse at 50% -20%, rgba(51, 149, 255, 0.18), transparent 60%),
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.04) 1px, transparent 0);
+  background-size: 100% 100%, 24px 24px;
+}
+
+/* Glowing border & subtle hover glass effect */
+.border-glass {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.border-glass:hover {
+  border-color: rgba(51, 149, 255, 0.35);
+}
+
+/* Focus ring tuned for dark fintech aesthetic */
 .focus-thread:focus-visible {
-  outline: 2px solid #d4a24e;
+  outline: 2px solid #3395FF;
   outline-offset: 2px;
+  box-shadow: 0 0 12px rgba(51, 149, 255, 0.4);
+}
+
+/* Custom sleek dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #08090C;
+}
+::-webkit-scrollbar-thumb {
+  background: #1F2430;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
 }

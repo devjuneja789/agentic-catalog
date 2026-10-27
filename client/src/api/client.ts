@@ -105,3 +105,144 @@ export async function runBuyerAgent(want: string, customerName: string): Promise
   }
   return res.json()
 }
+
+// --- Human-in-the-Loop Approval & Order APIs ---
+
+export async function getOrder(orderId: string): Promise<{ order: any }> {
+  const res = await fetch(`${API_BASE}/checkout/${orderId}`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? `Failed to fetch order: ${res.status}`)
+  }
+  return res.json()
+}
+
+export interface PendingOrdersResponse {
+  count: number
+  orders: any[]
+}
+
+export interface VerifyPaymentResponse {
+  status: string
+  orderId: string
+  paymentId?: string
+  order?: any
+  message?: string
+}
+
+export async function verifyOrderPayment(
+  orderId: string,
+  params?: { razorpayPaymentId?: string; razorpayPaymentLinkId?: string; razorpaySignature?: string },
+): Promise<VerifyPaymentResponse> {
+  const res = await fetch(`${API_BASE}/checkout/${orderId}/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params || {}),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? `Failed to verify payment: ${res.status}`)
+  }
+  return res.json()
+}
+
+// Alias for compatibility
+export const captureOrder = verifyOrderPayment
+
+export async function cancelOrder(
+  orderId: string,
+  reason?: string,
+): Promise<{
+  status: string
+  orderId: string
+  message: string
+  stockReleased?: number
+  order?: any
+}> {
+  const res = await fetch(`${API_BASE}/checkout/${orderId}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? `Failed to cancel order: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function getPendingOrders(): Promise<PendingOrdersResponse> {
+  const res = await fetch(`${API_BASE}/checkout/pending`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? `Failed to fetch pending orders: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function approveOrder(orderId: string): Promise<{
+  status: string
+  orderId: string
+  paymentLinkId?: string
+  paymentLink?: string
+  paymentLinkUrl?: string
+  order?: any
+}> {
+  const res = await fetch(`${API_BASE}/checkout/${orderId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? `Failed to approve order: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function denyOrder(orderId: string, reason?: string): Promise<{
+  status: string
+  orderId: string
+  message: string
+  stockReleased: number
+}> {
+  const res = await fetch(`${API_BASE}/checkout/${orderId}/deny`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? `Failed to deny order: ${res.status}`)
+  }
+  return res.json()
+}
+
+// --- Model Context Protocol (MCP) APIs ---
+
+export async function getMcpManifest(): Promise<any> {
+  const res = await fetch(`${API_BASE}/mcp/manifest`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? `Failed to fetch MCP manifest: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function executeMcpToolCall(
+  toolName: string,
+  args: Record<string, any>,
+): Promise<{
+  tool: string
+  content: Array<{ type: string; text: string }>
+  isError: boolean
+  raw?: any
+}> {
+  const res = await fetch(`${API_BASE}/mcp/tools/${toolName}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ arguments: args }),
+  })
+  return res.json()
+}
+
+

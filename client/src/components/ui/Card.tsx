@@ -12,10 +12,16 @@ export function Card({
   className?: string
 }) {
   return (
-    <div className={`rounded-xl border border-dust/15 bg-surface ${className}`}>
+    <div
+      className={`relative overflow-hidden rounded-xl border border-white/[0.08] bg-surface/90 backdrop-blur-md shadow-2xl transition-all duration-300 hover:border-white/[0.14] ${className}`}
+    >
       {(title || action) && (
-        <div className="flex items-center justify-between border-b border-dust/10 px-5 py-4">
-          {title && <h2 className="font-display text-lg font-semibold text-linen">{title}</h2>}
+        <div className="flex items-center justify-between border-b border-white/[0.06] bg-white/[0.01] px-5 py-3.5">
+          {title && (
+            <h2 className="text-sm font-semibold tracking-wide text-linen">
+              {title}
+            </h2>
+          )}
           {action}
         </div>
       )}

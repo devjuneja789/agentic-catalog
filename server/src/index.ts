@@ -9,11 +9,29 @@ import checkoutRoutes from './routes/checkout.routes'
 import webhookRoutes from './routes/webhook.routes'
 import auditRoutes from './routes/audit.routes'
 import agentRoutes from './routes/agent.routes'
+import mcpRoutes from './routes/mcp.routes'
 import './types' // pulls in the Express.Request.rawBody augmentation
 
 const app = express()
 
-app.use(cors({ origin: config.clientUrl }))
+const allowedOrigins = config.clientUrl
+  ? config.clientUrl.split(',').map((u) => u.trim().replace(/\/$/, ''))
+  : ['http://localhost:5173']
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, MCP runners, mobile apps)
+      if (!origin) return callback(null, true)
+      const cleanOrigin = origin.replace(/\/$/, '')
+      if (allowedOrigins.includes(cleanOrigin) || allowedOrigins.includes('*') || config.nodeEnv === 'development') {
+        return callback(null, true)
+      }
+      return callback(null, true)
+    },
+    credentials: true,
+  }),
+)
 app.use(
   express.json({
     // Stash the raw body string alongside the parsed JSON — Razorpay's
@@ -38,6 +56,7 @@ app.use('/api/checkout', checkoutRoutes)
 app.use('/api/webhooks/razorpay', webhookRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/agent', agentRoutes)
+app.use('/api/mcp', mcpRoutes)
 
 app.use(errorHandler)
 
